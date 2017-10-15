@@ -1,25 +1,222 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: "Nikolai Alexander"
+date: "2017-10-15"
 output: 
   html_document:
     keep_md: true
 ---
 
-
 ## Loading and preprocessing the data
 
+Loading the data is very simple. First we need to acess the .csv file inside of 'activity.zip' We can do this by calling the unzip() function, and pulling out the csv file. We can then read the .csv file using read.csv.
+
+```{r Loading}
+activity <- unzip("activity.zip", files = "activity.csv")
+data <- read.csv("activity.csv")
+head(data)
+```
+
+
+Next, we need to remove all NA values from the *steps* column for our future analysis.
+```{r remove na}
+data <- data[complete.cases(data),]
+head(data)
+```
+
+Next, we need to check the class of each piece of the data.
+```{r check class}
+steps <- data$steps
+date <- data$date
+interval <- data$interval
+
+class(steps)
+class(date)
+class(interval)
+```
+
+As we can see, 'date' is an *integer* class. We need to change it to the *Date* class.
+```{r date}
+date <- as.Date(date)
+class(date)
+```
+
+There we go! Now the data is ready to be anazlysed.
 
 
 ## What is mean total number of steps taken per day?
 
+To calculate the total number of steps per day, we first need to calculate the sum of all the steps for each day. (This is where removing the NA values comes in handy)
+```{r steps}
+tot_steps <- tapply(steps, date, sum)
+print(tot_steps)
+```
 
+Now to make a histogram to visualize our data.
+```{r steps hist}
+hist(
+  tot_steps,
+  breaks = 25,
+  freq = TRUE,
+  main = "Frequency of Total Steps per Day",
+  xlab = "Total Steps per Day"
+)
+```
+
+I set *breaks* to 25, because I felt it gave the most accurate idea, while still being easy to read.
+
+With this information we can now calculate the **mean** and **median** of the Total Steps Per Day
+```{r avg steps per day}
+mean_steps <- mean(tot_steps)
+med_steps <- median(tot_steps)
+
+print(mean_steps)
+print(med_steps)
+```
+
+So the **mean** of the total steps per day is **`r mean_steps`** and the **median** of the total steps per day is **`r med_steps`.** These match closely with the histogram above, making our calulations accurate.
 
 ## What is the average daily activity pattern?
 
+For this we need to look at the amount of steps taken per 5 minute interval each day. This is a similar process to finding the number of steps per day.
+```{r avg steps per interval}
+mean_intv <- tapply(steps, interval, mean)
 
+head(mean_intv)
+```
+
+There are 2355 intervals, so I did not print every value for the sake of space.
+
+Now, to make a plot of the time over each 5 minute interval
+```{r plot interval}
+  plot(
+    x = names(mean_intv),
+    y = mean_intv,
+    type = 'l',
+    main = "Mean of the Total Number of Steps per Interval",
+    xlab = "5-Minute Interval",
+    ylab = "Mean of the Total Number of Steps"
+  )
+```
+
+The plot shows that the maximum number of steps are make somewhere between 500 and 1000 minutes. We can find this, using the max() function
+```{r max interval}
+  max_intv <- mean_intv[which.max(mean_intv)]
+  print(max_intv)
+```
+
+The **max average number of steps** is **`r max_intv`** at **`r names(max_intv)`** minutes per day
 
 ## Imputing missing values
 
+To see the missing values, we need to go back to the original data
+```{r original data}
+orig_data <- read.csv("activity.csv")
 
+orig_steps <- orig_data$steps
+orig_date <- as.Date(orig_data$date)
+orig_interval <- orig_data$interval
+
+head(orig_data)
+```
+
+Now from here, we can count the amount of NA values in the dataset.
+```{r total NA}
+tot_NA <- sum(is.na(orig_data))
+print(tot_NA)
+```
+
+So the total number of NA values in the dataset is **`r tot_NA`**. If we try to look at the total number of steps for the day with these NA values, our results are going to be wrong
+```{r wrong tot}
+orig_tot_steps <- tapply(orig_steps, orig_date, sum)
+print(orig_tot_steps)
+```
+
+As you can see, there are NA values for some of the dates. To take care of that, we can replace the NA's with the mean of the total steps per day.
+```{r right mean}
+orig_tot_steps[is.na(orig_tot_steps)] <- mean_steps
+print(orig_tot_steps)
+```
+
+Now we have a complete data set! Let's compare with the data from the first part.
+```{r compare}
+par(mfrow = c(1,2))
+hist(
+  orig_tot_steps,
+  breaks = 25,
+  freq = TRUE,
+  main = "Data with Replaced NA Values",
+  xlab = "Total Steps per Day"
+)
+hist(
+  tot_steps,
+  breaks = 25,
+  freq = TRUE,
+  main = "Data from Part 1",
+  xlab = "Total Steps per Day"
+)
+```
+
+The plots are a little different. For one, the median is a lot more frequent with the new data that from the data in part 1. However, is the mean and median different? Let's check:
+```{r new mean}
+orig_mean <- mean(orig_tot_steps)
+orig_median <- median(orig_tot_steps)
+print(orig_mean)
+print(orig_median)
+```
+
+The **new mean** (`r orig_mean`) is *exactly equal* to the **old mean** (`r mean_steps`). However, the **new median** (`r orig_median`) is *slightly larger* than the **old median** (`r med_steps`). In fact, the new median is equal to the old mean. This is because for all the values where there would be NA values, they are replaces with the old mean; Causing there to be more values closer to the median.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+To tell the difference between weekdays and weekends, we first need to convert the dates to days of the week.
+```{r weekdays}
+orig_data$date <- weekdays(orig_date)
+head(orig_data)
+```
+
+Before we do anything, we need to replace all of the NA values for each interval:
+```{r replace NA intv}
+orig_data[is.na(orig_data)] <- mean_intv
+head(orig_data)
+```
+
+Now we can split the data into weekdays and weekends.
+```{r weekdays vs weekends}
+weekday <- orig_data[(orig_data$date != "Saturday" | orig_data$date != "Sunday"),]
+weekend <- orig_data[(orig_data$date == "Saturday" | orig_data$date == "Sunday"),]
+head(weekday)
+head(weekend)
+```
+
+Now, just like in Part 2, we need to find the mean over each 5 minute interval.
+```{r weekday mean}
+mean_weekday <- tapply(weekday$steps, weekday$interval, mean)
+mean_weekend <- tapply(weekend$steps, weekend$interval, mean)
+
+head(mean_weekday)
+head(mean_weekend)
+```
+
+Now we can plot the 2 and compare
+```{r plot week means}
+par(mfrow=c(1,2))
+plot(
+  x = names(mean_weekday),
+  y = mean_weekday,
+  type = 'l',
+  main = "Weekdays",
+  xlab = "5-Minute Interval",
+  ylab = "Mean of the Total Number of Steps"
+)
+plot(
+  x = names(mean_weekend),
+  y = mean_weekend,
+  type = 'l',
+  main = "Weekend",
+  xlab = "5-Minute Interval",
+  ylab = "Mean of the Total Number of Steps"
+)
+```
+
+There seems to be much more consistant activity during the weekend. However, during the weekday, there is a spike in activity earlier in the day. This could be due to exercise after a break at work, where during the weekend, a person has much more time to be active througout the day..
